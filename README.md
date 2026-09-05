@@ -1,25 +1,24 @@
+# NIFTY 500 AI Trading Agent V3
 
-# Trading Agent MVP
+This version upgrades the personal trading agent from CSV-only testing to a NIFTY 500 universe and Angel One historical-data connector.
 
-This is the first research/scanner prototype for a NIFTY 50 15-minute Trading Agent.
+## Current
+- NIFTY 500 constituent loading
+- Angel One instrument-master mapping
+- 15-minute historical candle connector
+- BUY / SELL / NO TRADE scoring
+- Entry / SL / Target / R:R
+- Paper-only scan
+- Live order execution locked
 
-## Run
+## Angel One Secrets
+Add these to Streamlit Secrets (never commit them to GitHub):
+- ANGEL_API_KEY
+- ANGEL_CLIENT_CODE
+- ANGEL_TOTP_SECRET
+- ANGEL_MPIN
 
-1. Install Python 3.10+.
-2. Open terminal in this folder.
-3. Run:
-   pip install -r requirements.txt
-   streamlit run app.py
-4. Upload a 15-minute OHLC/volume CSV.
+Do not send these values in chat.
 
 ## Important
-This prototype does NOT place orders. It is for research and paper trading.
-The current scoring rules are a starting hypothesis, not a proven profitable strategy.
-
-## Roadmap
-1. Add proper entry/exit backtest
-2. Add SL/target/position sizing
-3. Measure win rate, expectancy, profit factor and max drawdown
-4. Connect Angel One historical/live data
-5. Add alerts
-6. Add AI explanation layer
+The scanner is a rule-based research tool, not a guarantee of returns. Validate with historical backtesting and paper trading before any live execution.
