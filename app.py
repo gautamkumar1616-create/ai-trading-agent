@@ -231,32 +231,44 @@ tab1, tab2, tab3 = st.tabs(["NIFTY 500 Universe", "Paper Scan", "Next Build"])
 
 with tab1:
     st.subheader("NIFTY 500 Universe")
-    st.info("Universe loading is manual in V3.1 so the app does not get stuck on a slow external website.")
-    universe = pd.DataFrame(columns=["symbol"])
+    st.info("Universe loading is manual in V3.2 so the app does not get stuck on a slow external website.")
+
+    if "universe" not in st.session_state:
+        st.session_state.universe = pd.DataFrame(columns=["symbol"])
+    if "mapped" not in st.session_state:
+        st.session_state.mapped = pd.DataFrame()
 
     if st.button("Load NIFTY 500 Universe"):
         with st.spinner("Loading NIFTY 500 list..."):
             try:
-                universe = get_nifty500()
-                st.success(f"NIFTY 500 universe loaded: {len(universe)} symbols")
-                st.dataframe(universe.head(50), use_container_width=True)
+                st.session_state.universe = get_nifty500()
+                st.success(f"NIFTY 500 universe loaded: {len(st.session_state.universe)} symbols")
             except Exception as e:
                 st.error(str(e))
+
+    universe = st.session_state.universe
+    if not universe.empty:
+        st.dataframe(universe.head(50), use_container_width=True)
 
     if st.button("Load Angel One Instrument Master"):
         try:
             inst = get_angel_instruments()
             st.success(f"Angel instrument master loaded: {len(inst):,} instruments")
             nse_eq = inst[(inst["exch_seg"] == "NSE") & (inst["symbol"].str.endswith("-EQ"))].copy()
-            if not universe.empty:
-                universe["angel_symbol"] = universe["symbol"] + "-EQ"
-                mapped = universe.merge(
+            if universe.empty:
+                st.warning("First press 'Load NIFTY 500 Universe'.")
+            else:
+                u = universe.copy()
+                u["angel_symbol"] = u["symbol"] + "-EQ"
+                mapped = u.merge(
                     nse_eq[["symbol","token","name","exch_seg"]],
                     left_on="angel_symbol", right_on="symbol", how="left",
                     suffixes=("", "_angel")
                 )
-                st.write(f"Mapped NSE equity symbols: {mapped['token'].notna().sum()} / {len(mapped)}")
-                st.dataframe(mapped[["symbol","token"]].head(50), use_container_width=True)
+                st.session_state.mapped = mapped
+                count = int(mapped["token"].notna().sum())
+                st.success(f"Mapped NSE equity symbols: {count} / {len(mapped)}")
+                st.dataframe(mapped[["symbol","token"]].head(100), use_container_width=True)
         except Exception as e:
             st.error(str(e))
 
@@ -276,12 +288,14 @@ with tab2:
             if st.button("Scan NIFTY 500 (Paper Only)"):
                 try:
                     obj = angel_login()
-                    inst = get_angel_instruments()
-                    nse_eq = inst[(inst["exch_seg"] == "NSE") & (inst["symbol"].str.endswith("-EQ"))].copy()
-                    symbols = universe.copy()
-                    symbols["angel_symbol"] = symbols["symbol"] + "-EQ"
-                    mapped = symbols.merge(nse_eq[["symbol","token"]], left_on="angel_symbol", right_on="symbol", how="inner")
-                    mapped = mapped.drop_duplicates("symbol_x").head(max_stocks)
+                    mapped = st.session_state.get("mapped", pd.DataFrame()).copy()
+                    if mapped.empty:
+                        inst = get_angel_instruments()
+                        nse_eq = inst[(inst["exch_seg"] == "NSE") & (inst["symbol"].str.endswith("-EQ"))].copy()
+                        symbols = universe.copy()
+                        symbols["angel_symbol"] = symbols["symbol"] + "-EQ"
+                        mapped = symbols.merge(nse_eq[["symbol","token"]], left_on="angel_symbol", right_on="symbol", how="inner")
+                    mapped = mapped.drop_duplicates("symbol_x" if "symbol_x" in mapped.columns else "symbol").head(max_stocks)
 
                     end = datetime.now()
                     start = end - timedelta(days=lookback_days)
