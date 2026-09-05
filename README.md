@@ -1,4 +1,4 @@
-# NIFTY 500 AI Trading Agent V3
+# NIFTY 500 AI Trading Agent V3.1
 
 This version upgrades the personal trading agent from CSV-only testing to a NIFTY 500 universe and Angel One historical-data connector.
 
@@ -22,3 +22,6 @@ Do not send these values in chat.
 
 ## Important
 The scanner is a rule-based research tool, not a guarantee of returns. Validate with historical backtesting and paper trading before any live execution.
+
+## V3.1 fix
+The NIFTY 500 universe is loaded only when the user presses the button, with short network timeouts and multiple sources, so the app does not hang indefinitely during startup.

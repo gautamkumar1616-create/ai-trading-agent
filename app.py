@@ -121,22 +121,43 @@ def signal(d, risk_reward=2.0):
 # -------------------------
 @st.cache_data(ttl=86400)
 def get_nifty500():
+    # Use short network timeouts so Streamlit never stays stuck indefinitely.
     urls = [
         "https://www.niftyindices.com/IndexConstituent/ind_nifty500list.csv",
-        "https://raw.githubusercontent.com/psparsh/NIFTY-500/master/NIFTY500.csv",
+        "https://archives.nseindia.com/content/indices/ind_nifty500list.csv",
+        "https://raw.githubusercontent.com/kprohith/nse-stock-analysis/main/ind_nifty500list.csv",
     ]
     last_error = None
     for url in urls:
         try:
-            df = pd.read_csv(url)
+            import requests
+            r = requests.get(
+                url,
+                timeout=8,
+                headers={"User-Agent": "Mozilla/5.0"}
+            )
+            r.raise_for_status()
+            from io import StringIO
+            df = pd.read_csv(StringIO(r.text))
             df.columns = [str(c).strip() for c in df.columns]
-            sym_col = next((c for c in df.columns if c.upper() in ["SYMBOL", "SYMBOLS"]), None)
+            sym_col = next(
+                (c for c in df.columns if c.upper() in ["SYMBOL", "SYMBOLS"]),
+                None
+            )
             if sym_col:
-                out = pd.DataFrame({"symbol": df[sym_col].astype(str).str.strip().str.upper()})
-                return out.drop_duplicates().sort_values("symbol").reset_index(drop=True)
+                out = pd.DataFrame({
+                    "symbol": df[sym_col].astype(str).str.strip().str.upper()
+                })
+                out = out.drop_duplicates().sort_values("symbol").reset_index(drop=True)
+                if len(out) >= 450:
+                    return out
         except Exception as e:
             last_error = e
-    raise RuntimeError(f"Could not download NIFTY 500 constituent list: {last_error}")
+    raise RuntimeError(
+        "NIFTY 500 list could not be loaded automatically. "
+        "Network access may be temporarily blocked. "
+        f"Last error: {last_error}"
+    )
 
 @st.cache_data(ttl=86400)
 def get_angel_instruments():
@@ -210,13 +231,17 @@ tab1, tab2, tab3 = st.tabs(["NIFTY 500 Universe", "Paper Scan", "Next Build"])
 
 with tab1:
     st.subheader("NIFTY 500 Universe")
-    try:
-        universe = get_nifty500()
-        st.success(f"NIFTY 500 universe loaded: {len(universe)} symbols")
-        st.dataframe(universe.head(50), use_container_width=True)
-    except Exception as e:
-        st.error(str(e))
-        universe = pd.DataFrame(columns=["symbol"])
+    st.info("Universe loading is manual in V3.1 so the app does not get stuck on a slow external website.")
+    universe = pd.DataFrame(columns=["symbol"])
+
+    if st.button("Load NIFTY 500 Universe"):
+        with st.spinner("Loading NIFTY 500 list..."):
+            try:
+                universe = get_nifty500()
+                st.success(f"NIFTY 500 universe loaded: {len(universe)} symbols")
+                st.dataframe(universe.head(50), use_container_width=True)
+            except Exception as e:
+                st.error(str(e))
 
     if st.button("Load Angel One Instrument Master"):
         try:
@@ -237,8 +262,13 @@ with tab1:
 
 with tab2:
     st.subheader("Paper Scan")
+    try:
+        universe = get_nifty500()
+    except Exception:
+        universe = pd.DataFrame(columns=["symbol"])
+
     if universe.empty:
-        st.info("Load the NIFTY 500 universe first.")
+        st.info("NIFTY 500 universe is not currently available. Use the Universe tab to test loading.")
     else:
         if not (API_KEY and CLIENT_CODE and TOTP_SECRET and MPIN):
             st.info("For automatic historical scanning, add Angel One credentials to Streamlit Secrets. Do not paste them into the chat.")
